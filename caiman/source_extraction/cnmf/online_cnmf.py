@@ -20,7 +20,7 @@ from .utilities import update_order
 from caiman.source_extraction.cnmf import oasis
 from sklearn.decomposition import NMF
 from sklearn.preprocessing import normalize
-
+import cv2
 
 try:
     profile
@@ -453,14 +453,19 @@ def rank1nmf(Ypx, ain):
 @profile
 def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
                           dims, gSig, gSiz, ind_A, CY, CC, groups, oases, gnb=1,
-                          rval_thr=0.875, bSiz=3, robust_std=False,
+                          rval_thr=None, bSiz=3, robust_std=False,
                           N_samples_exceptionality=5, remove_baseline=True,
                           thresh_fitness_delta=-80, thresh_fitness_raw=-20, thresh_overlap=0.25,
                           batch_update_suff_stat=False, sn=None, g=None, thresh_s_min=None,
-                          s_min=None, Ab_dense=None, max_num_added=1, min_num_trial = 1):
+                          s_min=None, Ab_dense=None, max_num_added=1, min_num_trial = 1, loaded_model = None, thresh_CNN_noisy = 0.99):
 
     """
     Checks for new components in the residual buffer and incorporates them if they pass the acceptance tests    
+    
+    Parameters:
+    ----------
+    thresh_CNN_noisy: float
+        threshold on the per patch CNN classifier
     """
     
     order_rvl = 'C'
@@ -484,11 +489,12 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
 
         ind = np.argmax(sv_)
         ij = np.unravel_index(ind, dims,order=order_rvl)
-        # ijSig = [[np.maximum(ij[c] - gHalf[c], 0), np.minimum(ij[c] + gHalf[c] + 1, dims[c])]
+        # ijSig = [[np.maximum(ij[c] - gHalf[c], 0), np.minimum(ij[c] + gHalf[c] + 1, dsims[c])]
         #          for c in range(len(ij))]
         # better than above expensive call of numpy and loop creation
         ijSig = [[max(ij[0] - gHalf[0], 0), min(ij[0] + gHalf[0] + 1, dims[0])],
                  [max(ij[1] - gHalf[1], 0), min(ij[1] + gHalf[1] + 1, dims[1])]]
+        
 
         # xySig = np.meshgrid(*[np.arange(s[0], s[1]) for s in ijSig], indexing='xy')
         # arr = np.array([np.reshape(s, (1, np.size(s)), order='F').squeeze()
@@ -505,23 +511,38 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
         Ypx = Yres_buf.T[indeces, :]
 
         ain = np.maximum(np.mean(Ypx, 1), 0)
-        na = ain.dot(ain)
-        if not na:
-            break
+        ain2 = ain.copy()
+        
 
-        ain /= sqrt(na)
 
 #        new_res = sv_.copy()
 #        new_res[ np.ravel_multi_index(arr, dims, order='C')] = 10000
 
-        ain, cin, cin_res = rank1nmf(Ypx, ain)                  # expects and returns normalized ain
-        rval = corr(ain.copy(), np.mean(Ypx, -1))               # correlation coefficient                
+        patch_size = 50                
+        ain2 -= np.median(ain2)
+        ain2 = np.reshape(ain2,tuple(np.diff(ijSig).squeeze()),order= 'F')  
+        ain2 = cv2.resize(ain2/np.linalg.norm(ain2),(patch_size ,patch_size))
+                  
+        examine_patch = False
+        if thresh_CNN_noisy is not None:
+            predictions = loaded_model.predict(ain2[np.newaxis,:,:,np.newaxis], batch_size=32, verbose=0) 
+            examine_patch = predictions[0][0]>thresh_CNN_noisy
+            
+        if rval_thr is not None:
+            rval = corr(ain.copy(), np.mean(Ypx, -1))  
+            examine_patch = examine_patch or (rval>rval_thr)
+        # expects and returns normalized ain
+#                    # correlation coefficient                
 
-        if rval > rval_thr:
+        if examine_patch: #r:
+            na = ain.dot(ain)
+            if not na:
+                break    
+            ain /= sqrt(na)
+            ain, cin, cin_res = rank1nmf(Ypx, ain)  
             # use sparse Ain only later iff it is actually added to Ab
             Ain = np.zeros((np.prod(dims), 1), dtype=np.float32)
             Ain[indeces, :] = ain[:, None]
-
             cin_circ = cin.get_ordered()
 
     #        indeces_good = (Ain[indeces]>0.01).nonzero()[0]

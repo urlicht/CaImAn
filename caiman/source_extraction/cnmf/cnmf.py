@@ -77,7 +77,7 @@ class CNMF(object):
                  method_deconvolution='oasis', n_pixels_per_process=4000, block_size=5000, num_blocks_per_run = 20,
                  check_nan=True, skip_refinement=False, normalize_init=True, options_local_NMF=None, 
 				 minibatch_shape=100, minibatch_suff_stat=3,
-                 update_num_comps=True, rval_thr=0.9, thresh_fitness_delta=-20, 
+                 update_num_comps=True, rval_thr=0.9, thresh_fitness_delta=-20, thresh_CNN_noisy= 0.99,
 				 thresh_fitness_raw=-40, thresh_overlap=.5,
                  max_comp_update_shape=np.inf, num_times_comp_updated=np.inf,
                  batch_update_suff_stat=False, thresh_s_min=None, s_min=None,
@@ -240,7 +240,11 @@ class CNMF(object):
         
         min_num_trial : int, optional
             minimum numbers of attempts to include a new components in OnACID
-			
+            
+        thresh_CNN_noisy: float
+            threshold on the per patch CNN classifier for online algorithm    
+        
+
         Returns:
         --------
         self
@@ -320,7 +324,8 @@ class CNMF(object):
         self.center_psf = center_psf
         self.nb_patch = nb_patch
         self.del_duplicates = del_duplicates
-
+        self.thresh_CNN_noisy = thresh_CNN_noisy
+        
         self.options = CNMFSetParms((1,1,1), n_processes, p=p, gSig=gSig, gSiz=gSiz, 
 									K=k, ssub=ssub, tsub=tsub, 
                                     p_ssub=p_ssub, p_tsub=p_tsub, method_init=method_init,
@@ -753,6 +758,25 @@ class CNMF(object):
         for nneeuu in range(self.N):
             self.time_neuron_added.append((nneeuu, self.initbatch))
         self.time_spend = 0
+        
+        # setup per patch classifier
+        import keras
+        from keras.models import model_from_json
+        
+        # prepare CNN
+        json_path = 'use_cases/edge-cutter/residual_classifier_2classes.json'
+        model_path = 'use_cases/edge-cutter/residual_classifier_2classes.h5'
+        json_file = open(json_path, 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        loaded_model = model_from_json(loaded_model_json)
+        loaded_model.load_weights(model_path)
+        opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+        loaded_model.compile(loss=keras.losses.categorical_crossentropy,
+                      optimizer=opt,
+                      metrics=['accuracy'])   
+        self.loaded_model = loaded_model        
+        
         return self
 
     @profile
@@ -772,6 +796,7 @@ class CNMF(object):
             maximal number of iterations for HALS (NNLS via blockCD)
             
         
+			
         """
 
         t_start = time()
@@ -840,7 +865,7 @@ class CNMF(object):
                 thresh_s_min=self.thresh_s_min, s_min=self.s_min,
                 Ab_dense=self.Ab_dense[:, :self.M] if self.use_dense else None,
                 oases=self.OASISinstances if self.p else None, N_samples_exceptionality= self.N_samples_exceptionality,
-                max_num_added = self.max_num_added, min_num_trial = self.min_num_trial)
+                max_num_added = self.max_num_added, min_num_trial = self.min_num_trial, loaded_model = self.loaded_model, thresh_CNN_noisy = self.thresh_CNN_noisy)
 
             num_added = len(self.ind_A) - self.N
 
@@ -1015,6 +1040,7 @@ class CNMF(object):
                 self.Ab = Ab_
             self.time_spend += time() - t_start
             
+                               
     
     def compute_residuals(self, Yr):
         """compute residual for each component (variable YrA)
