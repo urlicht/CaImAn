@@ -100,6 +100,7 @@ Cn_init = Y.local_correlations(swap_dim = False)    # compute correlation image
 pl.imshow(Cn_init); pl.title('Correlation Image on initial batch'); pl.colorbar()
 
 #%% initialize OnACID with bare initialization
+gSig = (4,4)                                                        # expected half size of neurons
 
 cnm_init = bare_initialization(Y[:initbatch].transpose(1, 2, 0), init_batch=initbatch, k=K, gnb=gnb,
                                  gSig=gSig, p=p, minibatch_shape=100, minibatch_suff_stat=5,
@@ -109,13 +110,13 @@ cnm_init = bare_initialization(Y[:initbatch].transpose(1, 2, 0), init_batch=init
                                  deconv_flag = False, use_dense = True,
                                  simultaneously=False, n_refit=0, thresh_CNN_noisy = thresh_CNN_noisy)
 
-#%% Plot initialization results
+#% Plot initialization results
 
-crd = plot_contours(cnm_init.A.tocsc(), Cn_init, thr=0.9)
-A, C, b, f, YrA, sn = cnm_init.A, cnm_init.C, cnm_init.b, cnm_init.f, cnm_init.YrA, cnm_init.sn
-view_patches_bar(Yr, scipy.sparse.coo_matrix(A.tocsc()[:, :]), C[:, :], b, f, dims[0], dims[1], YrA=YrA[:, :], img=Cn_init)
+#crd = plot_contours(cnm_init.A.tocsc(), Cn_init, thr=0.9)
+#A, C, b, f, YrA, sn = cnm_init.A, cnm_init.C, cnm_init.b, cnm_init.f, cnm_init.YrA, cnm_init.sn
+#view_patches_bar(Yr, scipy.sparse.coo_matrix(A.tocsc()[:, :]), C[:, :], b, f, dims[0], dims[1], YrA=YrA[:, :], img=Cn_init)
 
-#%% Prepare object for OnACID
+#% Prepare object for OnACID
 
 save_init = False     # flag for saving initialization object. Useful if you want to check OnACID with different parameters but same initialization
 if save_init:   
@@ -136,14 +137,21 @@ def create_frame(cnm2,img_norm,captions):
     bgkrnd_frame = b.dot(f[:,t-1]).reshape(cnm2.dims, order = 'F')*img_norm/np.max(img_norm)  # denoised frame (components + background)
     if show_residuals:
         all_comps = np.reshape(cnm2.Yres_buf.mean(0),cnm2.dims, order='F')*img_norm/np.max(img_norm)
-        all_comps = np.minimum(np.maximum(all_comps*10,0),255)
+        all_comps = np.minimum(np.maximum(all_comps*7.5,0),255)
     else:
         all_comps = (np.array(A.sum(-1)).reshape(cnm2.dims, order = 'F'))                         # spatial shapes
     frame_comp_1 = cv2.resize(np.concatenate([frame_/np.max(img_norm),all_comps*3.],axis = -1),(2*np.int(cnm2.dims[1]*resize_fact),np.int(cnm2.dims[0]*resize_fact) ))
     frame_comp_2 = cv2.resize(np.concatenate([comps_frame*10.,comps_frame+bgkrnd_frame],axis = -1),(2*np.int(cnm2.dims[1]*resize_fact),np.int(cnm2.dims[0]*resize_fact) ))
-    frame_pn = np.concatenate([frame_comp_1,frame_comp_2],axis=0).T
+    frame_pn = np.concatenate([frame_comp_1,frame_comp_2],axis=0).T    
+    
     vid_frame = np.repeat(frame_pn[:,:,None],3,axis=-1)
     vid_frame = np.minimum((vid_frame*255.),255).astype('u1')
+    if show_residuals and cnm2.ind_new:
+       # import pdb
+       # pdb.set_trace()
+        add_v = np.int(cnm2.dims[1]*resize_fact)
+        cv2.rectangle(vid_frame,(int(cnm2.ind_new[0][0][1]*resize_fact),int(cnm2.ind_new[0][1][1]*resize_fact)+add_v),(int(cnm2.ind_new[0][0][0]*resize_fact),int(cnm2.ind_new[0][1][0]*resize_fact)+add_v),255,2)    
+    
     cv2.putText(vid_frame,captions[0],(5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
     cv2.putText(vid_frame,captions[1],(np.int(cnm2.dims[0]*resize_fact) + 5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
     cv2.putText(vid_frame,captions[2],(5,np.int(cnm2.dims[1]*resize_fact)  + 20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
@@ -162,10 +170,10 @@ tottime = []
 Cn = Cn_init.copy()
 
 plot_contours_flag = False               # flag for plotting contours of detected components at the end of each file
-play_reconstr = False                    # flag for showing video with results online (turn off flags for improving speed)
-save_movie = False                       # flag for saving movie (file could be quite large..)
-movie_name = folder_name + '/output.avi' # name of movie to be saved
-resize_fact = 1.2                        # image resizing factor
+play_reconstr = True                     # flag for showing video with results online (turn off flags for improving speed)
+save_movie = False                      # flag for saving movie (file could be quite large..)
+movie_name = folder_name + '/output_meso_NN.avi' # name of movie to be saved
+resize_fact = 1.6                        # image resizing factor
 
 if online_files == 0:                    # check whether there are any additional files
     process_files = fls[:init_files]     # end processing at this file
@@ -234,6 +242,8 @@ for iter in range(epochs):
     
             frame_cor = frame_cor / img_norm                        # normalize data-frame
             cnm2.fit_next(t, frame_cor.reshape(-1, order='F'))      # run OnACID on this frame
+            if cnm2.ind_new:
+                print('New components at time ' + str(int(t)))
             tottime.append(time() - t1)                             # store time
     
             t += 1

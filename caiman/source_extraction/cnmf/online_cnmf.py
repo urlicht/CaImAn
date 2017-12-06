@@ -468,6 +468,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
         threshold on the per patch CNN classifier
     """
     
+    ind_new = []
     order_rvl = 'C'
     gHalf = np.array(gSiz) // 2
 
@@ -603,6 +604,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
             if foo:
                 # print('adding component' + str(N + 1) + ' at timestep ' + str(t))
                 num_added += 1
+                ind_new.append(ijSig)
 #                ind_a = uniform_filter(np.reshape(Ain.toarray(), dims, order='F'), size=bSiz)
 #                ind_a = np.reshape(ind_a > 1e-10, (np.prod(dims),), order='F')
 #                indeces_good = np.where(ind_a)[0]#np.where(determine_search_location(Ain,dims))[0]
@@ -694,7 +696,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
                 first = False
                 sv_[indeces_] = 0
 
-    return Ab, Cf, Yres_buf, rho_buf, CC, CY, ind_A, sv, groups
+    return Ab, Cf, Yres_buf, rho_buf, CC, CY, ind_A, sv, groups, ind_new
 
 
 #%%
