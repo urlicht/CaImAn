@@ -107,7 +107,7 @@ cnm_init = bare_initialization(Y[:initbatch].transpose(1, 2, 0), init_batch=init
                                  update_num_comps = True, rval_thr=rval_thr,
                                  thresh_fitness_raw = thresh_fitness_raw,
                                  batch_update_suff_stat=True, max_comp_update_shape = max_comp_update_shape, 
-                                 deconv_flag = False, use_dense = True,
+                                 deconv_flag = False, use_dense = False,
                                  simultaneously=False, n_refit=0, thresh_CNN_noisy = thresh_CNN_noisy)
 
 #% Plot initialization results
@@ -125,7 +125,7 @@ if save_init:
     cnm_init = load_object(fls[0][:-4] + '_DS_' + str(ds_factor) + '.pkl')
     
 cnm_init._prepare_object(np.asarray(Yr), T1, expected_comps, idx_components=None, 
-                         min_num_trial = 10, N_samples_exceptionality = int(N_samples))
+                         min_num_trial = 10, N_samples_exceptionality = int(N_samples), max_num_added = 1)
 
 
 #%% create a function for plotting results in real time if needed
@@ -150,7 +150,10 @@ def create_frame(cnm2,img_norm,captions):
        # import pdb
        # pdb.set_trace()
         add_v = np.int(cnm2.dims[1]*resize_fact)
-        cv2.rectangle(vid_frame,(int(cnm2.ind_new[0][0][1]*resize_fact),int(cnm2.ind_new[0][1][1]*resize_fact)+add_v),(int(cnm2.ind_new[0][0][0]*resize_fact),int(cnm2.ind_new[0][1][0]*resize_fact)+add_v),(255,0,255),2)    
+        for ind_new in cnm2.ind_new:
+            #print(ind_new)
+            cv2.rectangle(vid_frame,(int(ind_new[0][1]*resize_fact),int(ind_new[1][1]*resize_fact)+add_v),
+                                         (int(ind_new[0][0]*resize_fact),int(ind_new[1][0]*resize_fact)+add_v),(255,0,255),2)
     
     cv2.putText(vid_frame,captions[0],(5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
     cv2.putText(vid_frame,captions[1],(np.int(cnm2.dims[0]*resize_fact) + 5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
@@ -187,7 +190,7 @@ else:
 shifts = []
 show_residuals = True
 if show_residuals:
-    caption = 'Mean Residual Bufer'
+    caption = 'Mean Residual Buffer'
 else:
     caption = 'Identified Components'
 captions = ['Raw Data','Inferred Activity',caption,'Denoised Data']
@@ -242,10 +245,11 @@ for iter in range(epochs):
                 templ = None
                 frame_cor = frame_
     
+            print(t)
             frame_cor = frame_cor / img_norm                        # normalize data-frame
             cnm2.fit_next(t, frame_cor.reshape(-1, order='F'))      # run OnACID on this frame
-            if cnm2.ind_new:
-                print('New components at time ' + str(int(t)))
+            #if cnm2.ind_new:
+            #    print('New components at time ' + str(int(t)))
             tottime.append(time() - t1)                             # store time
     
             t += 1
