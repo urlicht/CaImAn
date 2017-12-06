@@ -150,7 +150,7 @@ def create_frame(cnm2,img_norm,captions):
        # import pdb
        # pdb.set_trace()
         add_v = np.int(cnm2.dims[1]*resize_fact)
-        cv2.rectangle(vid_frame,(int(cnm2.ind_new[0][0][1]*resize_fact),int(cnm2.ind_new[0][1][1]*resize_fact)+add_v),(int(cnm2.ind_new[0][0][0]*resize_fact),int(cnm2.ind_new[0][1][0]*resize_fact)+add_v),255,2)    
+        cv2.rectangle(vid_frame,(int(cnm2.ind_new[0][0][1]*resize_fact),int(cnm2.ind_new[0][1][1]*resize_fact)+add_v),(int(cnm2.ind_new[0][0][0]*resize_fact),int(cnm2.ind_new[0][1][0]*resize_fact)+add_v),(255,0,255),2)    
     
     cv2.putText(vid_frame,captions[0],(5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
     cv2.putText(vid_frame,captions[1],(np.int(cnm2.dims[0]*resize_fact) + 5,20),fontFace = 5, fontScale = 1.2, color = (0,255,0), thickness = 1)
@@ -171,9 +171,9 @@ Cn = Cn_init.copy()
 
 plot_contours_flag = False               # flag for plotting contours of detected components at the end of each file
 play_reconstr = True                     # flag for showing video with results online (turn off flags for improving speed)
-save_movie = False                      # flag for saving movie (file could be quite large..)
+save_movie = False                       # flag for saving movie (file could be quite large..)
 movie_name = folder_name + '/output_meso_NN.avi' # name of movie to be saved
-resize_fact = 1.6                        # image resizing factor
+resize_fact = 1.5                        # image resizing factor
 
 if online_files == 0:                    # check whether there are any additional files
     process_files = fls[:init_files]     # end processing at this file
@@ -193,9 +193,11 @@ else:
 captions = ['Raw Data','Inferred Activity',caption,'Denoised Data']
 if save_movie and play_reconstr:
     #fourcc = cv2.VideoWriter_fourcc('8', 'B', 'P', 'S') 
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(movie_name,fourcc, 30.0, tuple([int(2*x*resize_fact) for x in cnm2.dims]))
-
+    #fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+    out = cv2.VideoWriter()#movie_name,fourcc, 30.0, tuple([int(2*x*resize_fact) for x in cnm2.dims]))
+    success = out.open(movie_name,fourcc,30.0,tuple([int(2*x*resize_fact) for x in cnm2.dims]),True)
+    
 for iter in range(epochs):    
     if iter > 0:
         process_files = fls[:init_files + online_files]     # if not on first epoch process all files from scratch
@@ -267,6 +269,7 @@ for iter in range(epochs):
         
 if save_movie:
     out.release()
+    out = None
 cv2.destroyAllWindows()
 #%%  save results (optional)
 save_results = False
@@ -275,6 +278,14 @@ if save_results:
     np.savez('results_analysis_online_MOT_CORR.npz',
              Cn=Cn, Ab=cnm2.Ab, Cf=cnm2.C_on, b=cnm2.b, f=cnm2.f,
              dims=cnm2.dims, tottime=tottime, noisyC=cnm2.noisyC, shifts=shifts)
+
+#%% create correlation image or raw data with applied shifts
+
+Y_off = cm.load_movie_chain(fls)[200:].apply_shifts(shifts,interpolation='cubic')
+Cn = Y_off.local_correlations(swap_dim=False)
+
+pl.figure();
+crd = cm.utils.visualization.plot_contours(cnm2.Ab[:,cnm2.gnb:], Cn, thr=0.95, display_numbers = False)
 
 #%% extract results from the objects and do some plotting
 A, b = cnm2.Ab[:, cnm2.gnb:], cnm2.Ab[:, :cnm2.gnb].toarray()
