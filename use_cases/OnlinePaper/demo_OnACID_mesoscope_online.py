@@ -125,7 +125,7 @@ if save_init:
     cnm_init = load_object(fls[0][:-4] + '_DS_' + str(ds_factor) + '.pkl')
     
 cnm_init._prepare_object(np.asarray(Yr), T1, expected_comps, idx_components=None, 
-                         min_num_trial = 10, N_samples_exceptionality = int(N_samples), max_num_added = 1)
+                         min_num_trial = 10, N_samples_exceptionality = int(N_samples), max_num_added = 5)
 
 
 #%% create a function for plotting results in real time if needed
@@ -174,8 +174,8 @@ Cn = Cn_init.copy()
 
 plot_contours_flag = False               # flag for plotting contours of detected components at the end of each file
 play_reconstr = True                     # flag for showing video with results online (turn off flags for improving speed)
-save_movie = False                       # flag for saving movie (file could be quite large..)
-movie_name = folder_name + '/output_meso_NN.avi' # name of movie to be saved
+save_movie = True                        # flag for saving movie (file could be quite large..)
+movie_name = folder_name + '/output_meso_NN_out5.avi' # name of movie to be saved
 resize_fact = 1.5                        # image resizing factor
 
 if online_files == 0:                    # check whether there are any additional files
@@ -199,7 +199,7 @@ if save_movie and play_reconstr:
     #fourcc = cv2.VideoWriter_fourcc(*'XVID')
     fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
     out = cv2.VideoWriter()#movie_name,fourcc, 30.0, tuple([int(2*x*resize_fact) for x in cnm2.dims]))
-    success = out.open(movie_name,fourcc,30.0,tuple([int(2*x*resize_fact) for x in cnm2.dims]),True)
+    success = out.open(movie_name,fourcc,15.0,tuple([int(2*x*resize_fact) for x in cnm2.dims]),True)
     
 for iter in range(epochs):    
     if iter > 0:
