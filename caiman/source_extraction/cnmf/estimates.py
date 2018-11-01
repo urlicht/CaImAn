@@ -347,7 +347,7 @@ class Estimates(object):
                                                         thr=thr, denoised_color=denoised_color, cmap=cmap)
         return self
 
-    def nb_view_components_3d(self, Yr=None, image_type='mean', dims=None,
+    def nb_view_components_3d(self, Yr=None, idx=None, image_type='mean', dims=None,
                               max_projection=False, axis=0,
                               denoised_color=None, cmap='jet', thr=0.9):
         """view spatial and temporal components interactively in a notebook
@@ -402,10 +402,28 @@ class Estimates(object):
             else:
                 self.R = self.YrA
 
-        caiman.utils.visualization.nb_view_patches3d(self.YrA, self.A, self.C,
-                    dims=dims, image_type=image_type, Yr=Yr,
-                    max_projection=max_projection, axis=axis, thr=thr,
-                    denoised_color=denoised_color, cmap=cmap)
+	##
+	        if idx is None:
+            caiman.utils.visualization.nb_view_patches(Yr, self.A, self.C,
+                    self.b, self.f, self.dims[0], self.dims[1], YrA=self.R, image_neurons=img,
+                    thr=thr, denoised_color=denoised_color, cmap=cmap)
+        else:
+            caiman.utils.visualization.nb_view_patches(Yr, self.A.tocsc()[:,idx],
+                                                        self.C[idx], self.b, self.f,
+                                                        self.dims[0], self.dims[1], YrA=self.R[idx], image_neurons=img,
+                                                        thr=thr, denoised_color=denoised_color, cmap=cmap)
+
+	##
+	if idx is None:
+		caiman.utils.visualization.nb_view_patches3d(self.YrA, self.A, self.C,
+			    dims=dims, image_type=image_type, Yr=Yr,
+			    max_projection=max_projection, axis=axis, thr=thr,
+			    denoised_color=denoised_color, cmap=cmap)
+	else:
+		caiman.utils.visualization.nb_view_patches3d(self.YrA[idx], self.A.tocsc()[:, idx], self.C[idx],
+			    dims=dims, image_type=image_type, Yr=Yr,
+			    max_projection=max_projection, axis=axis, thr=thr,
+			    denoised_color=denoised_color, cmap=cmap)		
 
         return self
 
