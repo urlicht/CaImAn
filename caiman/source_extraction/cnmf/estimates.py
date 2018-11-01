@@ -401,19 +401,6 @@ class Estimates(object):
                 self.compute_residuals(Yr)
             else:
                 self.R = self.YrA
-
-	##
-	        if idx is None:
-            caiman.utils.visualization.nb_view_patches(Yr, self.A, self.C,
-                    self.b, self.f, self.dims[0], self.dims[1], YrA=self.R, image_neurons=img,
-                    thr=thr, denoised_color=denoised_color, cmap=cmap)
-        else:
-            caiman.utils.visualization.nb_view_patches(Yr, self.A.tocsc()[:,idx],
-                                                        self.C[idx], self.b, self.f,
-                                                        self.dims[0], self.dims[1], YrA=self.R[idx], image_neurons=img,
-                                                        thr=thr, denoised_color=denoised_color, cmap=cmap)
-
-	##
 	if idx is None:
 		caiman.utils.visualization.nb_view_patches3d(self.YrA, self.A, self.C,
 			    dims=dims, image_type=image_type, Yr=Yr,
